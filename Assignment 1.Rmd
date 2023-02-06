@@ -1,0 +1,96 @@
+---
+title: "Assignment 1"
+author: "pb649@scarletmail.rutgers.edu"
+date: "2/06/2023"
+output: html_document
+---
+  
+```{r}
+library(readr)
+#Sparrow Example
+Bumpus_sparrows <- read_csv("~/Downloads/Bumpus_sparrows.csv")
+Bumpus_sparrows
+sparr1 <- Bumpus_sparrows
+sparr1
+```
+
+## Drop 1st column as it does not contain numeric values
+```{r}
+sparr<- sparr1[,-1]
+sparr
+```
+
+## Matrix for Survived sparrows
+```{r}
+Survivors=sparr[1:21,]
+Survivors
+```
+
+## Matrix for Non-Survived Sparrows
+```{r}
+Remnants=sparr[22:49,]
+Remnants
+```
+
+## Computing the means of Survivors
+
+```{r}
+colMeans(Survivors)
+```
+
+## Computing the means of Non-Survivors
+```{r}
+colMeans(Remnants)
+```
+
+## Covariance matrice for survivors
+## Inference
+* A positive covariance indicates that both variables are more likely to be high or low at the same time.
+* Alar_extent and Total_length has the highest covarience, while L_keel_sternum and L_humerous has the least.
+
+```{r}
+cov(Survivors[,c("Total_length","Alar_extent","L_beak_head","L_humerous","L_keel_sternum")])
+```
+
+## Covariance matrice for Non-survivors
+## Inference
+* A positive covariance indicates that both variables are more likely to be high or low at the same time.
+* Covariance of L_beak_head and L_humerous are contradicting to correlation of L_beak_head and L_humerous. 
+
+```{r}
+cov(Remnants[, c("Total_length","Alar_extent","L_beak_head","L_humerous","L_keel_sternum")])
+```
+
+## Correlation of Survivors 
+## Inference:
+* If the correlation coefficient value is 1 then it is positive correlation. The nearer the coefficient value to 1 the stronger the correlation is.
+* Correlation between L_humerous and Alar_extent is the strongest as the coefficient value is much closer to 1. 
+* Correlation between L_keel_sternum  and Alar_extent is weak one as the coefficient value is further away from  1.
+
+```{r}
+cor(Survivors[,c("Total_length","Alar_extent","L_beak_head","L_humerous","L_keel_sternum")])
+```
+
+## Correlation of Non-Survivors
+## Inference:
+* If the correlation coefficient value is 1 then it is positive correlation. The nearer the coefficient value to 1 the stronger the correlation is.
+* Correlation between L_humerous and L_beak_head is the strongest as the coefficient value is much closer to 1. 
+* Correlation between L_keel_sternum and L_beak_head has the smallest coefficient value.
+
+```{r}
+cor(Remnants[, c("Total_length","Alar_extent","L_beak_head","L_humerous","L_keel_sternum")])
+
+```
+## Boxplot for comparison 
+## Inference
+* If the length is more then it will not survive. If the length is less then they survive. i.e if they are above median value then they won't survive.
+
+```{r}
+library (ggplot2)
+ggplot(sparr1, aes(x=Total_length, fill=Survivorship))+geom_boxplot()+ labs(title='Survivorship comparison')
+
+```
+
+
+
+
