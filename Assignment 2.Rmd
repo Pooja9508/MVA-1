@@ -112,7 +112,9 @@ lastplot + theme_tufte()
 lastplot + theme_wsj()
 ```
 
+## Inference 
 
+* We can see that in most of the plots that the outliers didn't survive and the survivors are converging towards the centre.
 
 
 
