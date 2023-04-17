@@ -1,0 +1,453 @@
+---
+title: "Individual Project"
+author: "pb649@scarletmail.rutgers.edu"
+date: "04/17/2023"
+output: html_document
+---
+```{r}
+# Principle Component Analysis
+
+library(readr)
+library(ggplot2)
+library(lattice)
+library(ggridges)
+library(ggvis)
+library(ggthemes)
+library(cowplot)
+library(gapminder)
+library(gganimate)
+library(dplyr)
+library(tidyverse)
+library(grid)
+library(gridExtra)
+library(RColorBrewer)
+library(readr)
+#Covid-liver cancer Example
+Cancer<- read_csv("~/Downloads/Cancer_Breast.csv")
+Cancer
+str(Cancer)
+#Get the Correlations between the measurements
+Cancer$Stage<-as.numeric(factor(Cancer$Stage, labels=c("1","2","3","4")))
+Cancer1=cor(Cancer[-1])
+colMeans(Cancer1)
+library (ggplot2)
+ggplot(Cancer, aes(x=Stage, fill=Survivor))+geom_boxplot()+ labs(title='Survivorship comparison')
+ggplot(Cancer, aes(x=Survivor,y=Stage)) + geom_boxplot()
+
+## From the plot we can see that the survival rate for stage 1-2 is more, while in stage 2-3 there are no survivors. 
+
+
+# Using prcomp to compute the principal components (eigenvalues and eigenvectors). With scale=TRUE, variable means are set to zero, and variances set to one
+Cancer_pca <- prcomp(Cancer[,-1],scale=TRUE)
+Cancer_pca
+summary(Cancer_pca)
+
+## In Standard deviation we can infer that:
+## PC1 is mostly driven by Tumor Size, Stage, and Reginol Node Positive, which all have relatively high loadings on this component.
+## PC2 is mostly driven by Regional Node Examined, Reginol Node Positive, and Age, which all have relatively high loadings on this component.
+## PC3 is mostly driven by Sex, Survival Months, and Tumor Size, which all have relatively high loadings on this component.
+## There are negative loadings for some variables on certain PCs, indicating that they are negatively associated with those components. For example, Age has a negative loading on PC1, meaning that as PC1 increases, Age tends to decrease.
+
+
+# sample scores stored in cancer_pca$x
+# singular values (square roots of sevenvalues) stored in Cancer_pca$sdev
+# loadings (eigenvectors) are stored in Cancer_pca$rotation
+# variable means stored in Cancer_pca$center
+# variable standard deviations stored in Cancer_pca$scale
+# A table containing eigenvalues and %'s accounted, follows
+# Eigenvalues are sdev^2
+(eigen_Cancer <- Cancer_pca$sdev^2)
+names(eigen_Cancer) <- paste("PC",1:5,sep="")
+eigen_Cancer
+sumlambdas <- sum(eigen_Cancer)
+sumlambdas
+propvar <- eigen_Cancer/sumlambdas
+propvar
+cumvar_Cancer <- cumsum(propvar)
+cumvar_Cancer
+matlambdas <- rbind(eigen_Cancer,propvar,cumvar_Cancer)
+rownames(matlambdas) <- c("Eigenvalues","Prop. variance","Cum. prop. variance")
+round(matlambdas,4)
+summary(Cancer_pca)
+Cancer_pca$rotation
+print(Cancer_pca)
+
+## Sample scores stored in Cancer_pca$x
+Cancer_pca$x
+# Identifying the scores by their survival status
+sparrtyp_pca <- cbind(data.frame(Cancer$Survivor),Cancer_pca$x)
+sparrtyp_pca
+# Means of scores for all the PC's classified by Survival status
+tabmeansPC <- aggregate(sparrtyp_pca[,2:6],by=list(Survivor=Cancer$Survivor),mean)
+tabmeansPC
+
+## Inference
+## PC1, the mean value for the Alive group is negative (-0.191643), while for the Dead group, it is positive (1.039420), indicating that PC1 has a strong influence on separating the two groups. Similarly, for PC2 and PC5, the mean values for the Dead group are higher than those for the Alive group, indicating that these components also contribute to the separation of the two groups.
+## For PC3 and PC4, the mean values are positive for the Alive group and negative for the Dead group. This suggests that these components are less important in distinguishing between the two groups of cancer patients.
+
+tabmeansPC <- tabmeansPC[rev(order(tabmeansPC$Survivor)),]
+tabmeansPC
+
+## From the tabmeansPC we can infer that the patients who died have higher average values of PC1 to PC5 compared to those who survived.
+
+tabfmeans <- t(tabmeansPC[,-1])
+tabfmeans
+colnames(tabfmeans) <- t(as.vector(tabmeansPC[1]$Survivor))
+tabfmeans
+# Standard deviations of scores for all the PC's classified by Survival status
+tabsdsPC <- aggregate(sparrtyp_pca[,2:6],by=list(Survivor=Cancer$Survivor),sd)
+tabfsds <- t(tabsdsPC[,-1])
+colnames(tabfsds) <- t(as.vector(tabsdsPC[1]$Survivor))
+tabfsds
+t.test(PC1~Cancer$Survivor,data=sparrtyp_pca)
+
+## The t-test is used to determine whether there is a significant difference between the mean PC1 scores of the "Alive" and "Dead" groups.
+## The output shows that the t-statistic is -4.5695 and the p-value is 2.14e-05, which is much less than 0.05, the commonly used significance level. Therefore, we reject the null hypothesis and conclude that there is a significant difference between the mean PC1 scores of the "Alive" and "Dead" groups.
+
+t.test(PC2~Cancer$Survivor,data=sparrtyp_pca)
+
+## For PC2, the p-value of the t-test is greater than 0.05, indicating that there is no strong evidence to suggest that the mean values of PC2 are different between the two groups.
+
+t.test(PC3~Cancer$Survivor,data=sparrtyp_pca)
+
+## The p-values for the t-tests of PC1, PC2, and PC3 between the two groups (Alive and Dead) are 2.14e-05, 0.06614, and 1.482e-05, respectively. These p-values indicate that there is strong evidence to reject the null hypothesis of no difference in the mean values of the principal components between the two groups for PC1 and PC3. 
+## However, for PC2, the p-value is relatively high (0.06614), which suggests that there is no strong evidence to reject the null hypothesis of no difference in the mean values of PC2 between the two groups.
+t.test(PC4~Cancer$Survivor,data=sparrtyp_pca)
+
+## Based on the t-tests, we can see that there are significant differences in the means of PC1, PC3, and PC4 between the Alive and Dead groups, as evidenced by their low p-values (p < 0.05). However, there is no significant difference in the means of PC2 between the two groups (p > 0.05).
+
+t.test(PC5~Cancer$Survivor,data=sparrtyp_pca)
+
+## F ratio tests
+var.test(PC1~Cancer$Survivor,data=sparrtyp_pca)
+var.test(PC2~Cancer$Survivor,data=sparrtyp_pca)
+var.test(PC3~Cancer$Survivor,data=sparrtyp_pca)
+var.test(PC4~Cancer$Survivor,data=sparrtyp_pca)
+var.test(PC5~Cancer$Survivor,data=sparrtyp_pca)
+
+# Levene's tests (one-sided)
+library(car)
+(LTPC1 <- leveneTest(PC1~Cancer$Survivor,data=sparrtyp_pca))
+(p_PC1_1sided <- LTPC1[[3]][1]/2)
+(LTPC2 <- leveneTest(PC2~Cancer$Survivor,data=sparrtyp_pca))
+(p_PC2_1sided=LTPC2[[3]][1]/2)
+(LTPC3 <- leveneTest(PC3~Cancer$Survivor,data=sparrtyp_pca))
+(p_PC3_1sided <- LTPC3[[3]][1]/2)
+(LTPC4 <- leveneTest(PC4~Cancer$Survivor,data=sparrtyp_pca))
+(p_PC4_1sided <- LTPC4[[3]][1]/2)
+(LTPC5 <- leveneTest(PC5~Cancer$Survivor,data=sparrtyp_pca))
+(p_PC5_1sided <- LTPC5[[3]][1]/2)
+
+# Plotting the scores for the first and second components
+plot(eigen_Cancer, xlab = "Component number", ylab = "Component variance", type = "l", main = "Scree Diagram")
+plot(log(eigen_Cancer), xlab = "Component number",ylab = "log(Component variance)", type="l",main = "Log(eigenvalue) diagram")
+print(summary(Cancer_pca))
+diag(cov(Cancer_pca$x))
+xlim <- range(Cancer_pca$x[,1])
+Cancer_pca$x[,1]
+Cancer_pca$x
+Cancer_pca$rotation[,1]
+Cancer_pca$rotation
+Cancer_pca$x
+plot(Cancer_pca)
+
+#get the original value of the data based on PCA
+center <- Cancer_pca$center
+scale <- Cancer_pca$scale
+new_Cancer <- as.matrix(Cancer[,-1])
+new_Cancer
+drop(scale(new_Cancer,center=center, scale=scale)%*%Cancer_pca$rotation[,1])
+predict(Cancer_pca)[,1]
+#The aboved two gives us the same thing. predict is a good function to know.
+Cancer$Survivor <- as.factor(Cancer$Survivor)
+out <- sapply(1:5, function(i){plot(Cancer$Survivor,Cancer_pca$x[,i],xlab=paste("PC",i,sep=""),ylab="Survivor")})
+
+
+```
+
+
+
+```{r}
+# Factor Analysis
+#EFA
+
+library(psych)
+
+Cancer<- read.csv("~/Downloads/Cancer_Breast.csv")
+
+attach(Cancer)
+Cancer[1]
+fit.pc <- principal(Cancer[-1], nfactors=5, rotate="varimax")
+fit.pc
+round(fit.pc$values, 3)
+
+#Infernce
+# In the round function we can infer that there are six eigenvalues displayed in descending order.
+
+fit.pc$loadings
+# Loadings with more digits
+for (i in c(1,3,2,4)) { print(fit.pc$loadings[[1,i]])}
+# Communalities
+fit.pc$communality
+
+## The output shows the communality values for each variable in the dataset. The values range from 0 to 1, with higher values indicating that a greater proportion of the variance.
+## The variable "Age" has a communality value of 0.9993287, indicating that almost all of the variance in age can be explained by the other variables in the model. Similarly, the variables "Stage", "Tumor.Size", and "Survival.Months" all have high communality values.
+## On the other hand, the variables "Regional.Node.Examined" and "Reginol.Node.Positive" have lower communality values.
+
+# Rotated factor scores, Notice the columns ordering: RC1, RC3, RC2 and RC4
+fit.pc$scores
+# Play with FA utilities
+
+fa.parallel(Cancer[-1]) # See factor recommendation
+
+# Inference
+# fa.parallel(Cancer[-1]) is performing a parallel analysis on the Cancer data set, excluding the Survivor variable. In a resulting scree plot we can compare the eigenvalues of the original data set to the mean and percentile values of the eigenvalues of the simulated data sets. The point at which the eigenvalues of the original data set intersect the mean or percentile values of the eigenvalues of the simulated data sets is a suggestion for the number of factors to retain.
+
+
+fa.plot(fit.pc) # See Correlations within Factors
+fa.diagram(fit.pc) # Visualize the relationship
+vss(Cancer[-1]) # See Factor recommendations for a simple structure
+
+
+
+
+# Computing Correlation Matrix
+corrm.emp <- cor(Cancer[-1])
+corrm.emp
+
+#Inference
+# The correlation matrix shows that all variables are moderately to strongly correlated with each other, indicating that there is some redundancy in the data.
+
+plot(corrm.emp)
+Cancer_pca <- prcomp(Cancer[-1], scale=TRUE)
+summary(Cancer_pca)
+
+# Inference
+# From the summary statistics, we can see that the first principal component (PC1) explains 32.07% of the total variance, the second principal component (PC2) explains 16.82%, and so on. The first two principal components (PC1 and PC2) together explain 48.89% of the total variance. The cumulative proportion reaches 97.33% after the sixth principal component (PC6), meaning that the remaining principal components explain very little additional variance in the data.
+
+plot(Cancer_pca)
+# A table containing eigenvalues and %'s accounted, follows. Eigenvalues are the sdev^2
+(eigen_Cancer <- round(Cancer_pca$sdev^2,3))
+round(fit.pc$values, 3)
+names(eigen_Cancer) <- paste("PC",1:6,sep="")
+eigen_Cancer
+sumlambdas <- sum(eigen_Cancer)
+sumlambdas
+## Inference
+# sumlambdas is equal to 7, this suggests that the PCA extracted 7 principal components from the data, and that the sum of their corresponding eigenvalues explains all of the variation in the data.
+propvar <- round(eigen_Cancer/sumlambdas,2)
+propvar
+cumvar_Cancer <- cumsum(propvar)
+cumvar_Cancer
+matlambdas <- rbind(eigen_Cancer,propvar,cumvar_Cancer)
+matlambdas
+rownames(matlambdas) <- c("Eigenvalues","Prop. variance","Cum. prop. variance")
+rownames(matlambdas)
+eigvec.emp <- Cancer_pca$rotation
+print(Cancer_pca)
+# Taking the first four PCs to generate linear combinations for all the variables with four factors
+pcafactors.emp <- eigvec.emp[,1:6]
+pcafactors.emp
+# Multiplying each column of the eigenvector’s matrix by the square-root of the corresponding eigenvalue in order to get the factor loadings
+unrot.fact.emp <- sweep(pcafactors.emp,MARGIN=2,Cancer_pca$sdev[1:6],`*`)
+unrot.fact.emp
+# Computing communalities
+communalities.emp <- rowSums(unrot.fact.emp^2)
+communalities.emp
+# Performing the varimax rotation. The default in the varimax function is norm=TRUE thus, Kaiser normalization is carried out
+rot.fact.emp <- varimax(unrot.fact.emp)
+#View(unrot.fact.emp)
+rot.fact.emp
+# The print method of varimax omits loadings less than abs(0.1). In order to display all the loadings, it is necessary to ask explicitly the contents of the object $loadings
+fact.load.emp <- rot.fact.emp$loadings[,1:6]
+fact.load.emp
+# Computing the rotated factor scores for the 30 European Countries. Notice that signs are reversed for factors F2 (PC2), F3 (PC3) and F4 (PC4)
+scale.emp <- scale(Cancer[-1])
+scale.emp
+
+```
+
+
+
+```{r}
+#Logistic Regression
+
+library(readr)
+library(ggplot2)
+library(cowplot)
+#library(regclass)
+#library(caret)
+library(e1071)
+library(pROC)
+
+data<- read_csv("~/Downloads/BC.csv")
+head(data)
+str(data)
+
+## Exploratory Analysis
+
+xtabs(~ Survivor + Age, data=data)
+xtabs(~ Survivor + Stage, data=data)
+xtabs(~ Survivor + Tumor.Size, data=data)
+xtabs(~ Survivor + Regional.Node.Examined, data=data)
+xtabs(~ Survivor + Reginol.Node.Positive, data=data)
+xtabs(~ Survivor + Survival.Months, data=data)
+xtabs(~ Survivor + Sex, data=data)
+
+logistic_simple <- glm(Survivor ~ Sex, data=data, family="binomial")
+summary(logistic_simple)
+
+# Inference
+# Here the logistic regression model includes only one predictor variable, Sex. The estimated intercept is 1.6382 and the estimated coefficient for Sex is 0.2544. The p-value for Sex is 0.48, which indicates that the effect of Sex on Survivor is not statistically significant at the 0.05 level. Therefore, we cannot conclude that there is a significant association between Sex and Survivor in this model.
+
+female.log.odds <- log(25 / 71)
+female.log.odds
+# Now you know how these are calculated
+male.log.odds.ratio <- log((112 / 89) / (25/71))
+male.log.odds.ratio
+## Lastly, let's  see what this logistic regression predicts, given
+## that a patient is either female or male (and no other data about them).
+predicted.data <- data.frame(probability.of.Survivor=logistic_simple$fitted.values,sex=data$Sex)
+predicted.data
+## We can plot the data...
+#ggplot(data=predicted.data ,aes(x=sex, y=probability.of.Survivor))+ geom_point(aes(color=sex), size=5) + xlab("Sex") 
+# + ylab("Predicted probability of getting heart disease")
+xtabs(~ probability.of.Survivor + sex, data=predicted.data)
+
+# Inference
+# The table shows that 295 females and 0 males are predicted to have a survival probability of 0.837 or lower. Additionally, 0 females and 84 males are predicted to have a survival probability of 0.869 or higher. This suggests that there may be a difference in the predicted survival rates between males and females, with females having higher predicted survival rates in this particular model.
+logistic <- glm(Survivor ~ ., data=data, family="binomial")
+summary(logistic)
+
+# In the output the coefficients for each predictor variable give us information about the strength and direction of the relationship between that variable and the response variable (Survivor in this case).
+# This represents the log-odds of the response variable when all predictor variables are equal to zero. In this case, the intercept is not statistically significant,i.e there is no evidence of a significant difference in the log-odds of survival between men and women when all other predictor variables are equal to zero.
+
+## Now calculate the overall "Pseudo R-squared" and its p-value
+ll.null <- logistic$null.deviance/-2
+ll.proposed <- logistic$deviance/-2
+(ll.null - ll.proposed) / ll.null
+## The p-value for the R^2
+1 - pchisq(2*(ll.proposed - ll.null), df=(length(logistic$coefficients)-1))
+predicted.data <- data.frame(probability.of.Survivor=logistic$fitted.values,Survivor=data$Survivor)
+predicted.data <- predicted.data[order(predicted.data$probability.of.Survivor, decreasing=FALSE),]
+predicted.data$rank <- 1:nrow(predicted.data)
+## Lastly, we can plot the predicted probabilities for each sample having
+## heart disease and color by whether or not they actually had heart disease
+ggplot(data=predicted.data, aes(x=rank, y=probability.of.Survivor)) +
+geom_point(aes(color=Survivor), alpha=1, shape=4, stroke=2) +
+xlab("Index") +
+ylab("Predicted probability of getting heart disease")
+
+# From Caret
+pdata <- predict(logistic,newdata=data,type="response" )
+pdata
+data$Survivor
+pdataF <- as.factor(ifelse(test=as.numeric(pdata>0.5) == 0, yes="Alive", no="Dead"))
+
+#From e1071::
+#confusionMatrix(pdataF, data$Survivor)
+# From pROC
+roc(data$Survivor,logistic$fitted.values,plot=TRUE)
+par(pty = "s")
+roc(data$Survivor,logistic$fitted.values,plot=TRUE)
+
+## NOTE: By default, roc() uses specificity on the x-axis and the values range
+## from 1 to 0. This makes the graph look like what we would expect, but the
+## x-axis itself might induce a headache. To use 1-specificity (i.e. the
+## False Positive Rate) on the x-axis, set "legacy.axes" to TRUE.
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE)
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage")
+
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4)
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4)
+## If we want to find out the optimal threshold we can store the
+## data used to make the ROC graph in a variable...
+roc.info <- roc(data$Survivor, logistic$fitted.values, legacy.axes=TRUE)
+str(roc.info)
+## tpp = true positive percentage
+## fpp = false positive precentage
+roc.df <- data.frame(tpp=roc.info$sensitivities*100, fpp=(1 - roc.info$specificities)*100,thresholds=roc.info$thresholds)
+roc.df
+head(roc.df) 
+## head() will show us the values for the upper right-hand corner of the ROC graph, when the threshold is so low
+## (negative infinity) that every single sample is called "obese".
+## Thus TPP = 100% and FPP = 100%
+tail(roc.df) 
+## tail() will show us the values for the lower left-hand corner
+## of the ROC graph, when the threshold is so high (infinity)
+## that every single sample is called "not obese".
+## Thus, TPP = 0% and FPP = 0%
+## now let's look at the thresholds between TPP 60% and 80%
+roc.df[roc.df$tpp > 60 & roc.df$tpp < 80,]
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, percent=TRUE)
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, percent=TRUE, print.auc=TRUE)
+roc(data$Survivor,logistic$fitted.values,plot=TRUE, legacy.axes=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, percent=TRUE, print.auc=TRUE, partial.auc=c(100, 90), auc.polygon = TRUE, auc.polygon.col = "#377eb822", print.auc.x=45)
+# Lets do two roc plots to understand which model is better
+roc(data$Survivor, logistic_simple$fitted.values, plot=TRUE, legacy.axes=TRUE, percent=TRUE, xlab="False Positive Percentage", ylab="True Postive Percentage", col="#377eb8", lwd=4, print.auc=TRUE)
+# Lets add the other graph
+plot.roc(data$Survivor, logistic$fitted.values, percent=TRUE, col="#4daf4a", lwd=4, print.auc=TRUE, add=TRUE, print.auc.y=40)
+legend("bottomright", legend=c("Simple", "Non Simple"), col=c("#377eb8", "#4daf4a"), lwd=4) 
+```
+
+```{r}
+# ggplots
+
+library(ggplot2)
+library(lattice)
+library(ggridges)
+library(ggvis)
+library(ggthemes)
+library(cowplot)
+library(gapminder)
+library(gganimate)
+library(dplyr)
+library(tidyverse)
+library(grid)
+library(gridExtra)
+library(RColorBrewer)
+library(readr)
+
+Cancer<- read_csv("~/Downloads/BC.csv")
+Cancer
+str(Cancer)
+
+# Scatter plot
+ggplot(Cancer, aes(x=Age,y=Stage))+geom_point(aes(color=Survivor)) 
+
+## We can see from the graph that there are no deaths for any age group in stage 1 of cancer.
+## In stage 2 there are negligle deaths.
+## In stage 3 30-40 and 50-60 years age group there are few deaths.
+## In stage 4 death rates are more.
+ggplot(Cancer, aes(x=Stage,y=Tumor.Size))+geom_point(aes(color=Survivor)) 
+
+## From this graph we can infere that death rates are more in stage 3 and 4 for tumor size 50 and above.
+
+ggplot(Cancer, aes(x=Age,y=Survival.Months)) + facet_wrap(~Stage) + geom_point(aes(color=Survivor))
+
+# Histogram
+
+ggplot(Cancer, aes(Stage))+geom_histogram(fill='coral', color='white',bins=10)
+ggplot(Cancer, aes(Sex))+geom_histogram(aes(fill=after_stat(count)))
+
+# We can see from this graph that stage 1 & 2 patients are more.
+
+# Bar chart
+
+ggplot(Cancer, aes(Survivor))+ geom_bar(position="stack", fill='seagreen') 
+
+## Number of survivors are more compared to non-survivors.
+ggplot(Cancer, aes(Stage)) + facet_grid(.~Survivor) + geom_bar(position="dodge",fill='violet')
+
+# box plot
+
+ggplot(Cancer, aes(x=Survivor,y=Age)) + geom_boxplot()
+ggplot(Cancer, aes(x=Survival.Months,y=Stage)) + geom_boxplot() + coord_flip()
+
+# hexbin
+
+ggplot(Cancer, aes(x=Age, y=Stage)) + geom_hex()
+
+
+```
+
+  
